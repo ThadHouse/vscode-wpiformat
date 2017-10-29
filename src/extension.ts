@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext) {
         if (config === false) {
             return;
         }
-        
+
         if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length < 1) {
             return;
         }
@@ -30,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
 
         runWpiformatOnFile(td.uri, (s) => {
-            
+
         });
     });
 
@@ -46,7 +46,7 @@ export function activate(context: vscode.ExtensionContext) {
         //editor.document.fileName
 
         runWpiformatOnFile(editor.document.uri, (s) => {
-            
+
         });
 
         // Display a message box to the user
@@ -101,12 +101,16 @@ function runWpiformatOnFile(fileUri: vscode.Uri, onSuccess: (output: string) => 
     const child = exec(`wpiformat -f ${filePath}`, {
         cwd: gitRepo
     }, (err, stdout, stderr) => {
-        if (err == null) return;
+        let diagnostics : vscode.Diagnostic[] = [];
+        if (err == null)  {
+            let diag = vscode.languages.createDiagnosticCollection("file");
+            diag.set(fileUri, diagnostics);
+            return;
+        }
         if (detectClangFormatMissing(stderr)) {
             vscode.window.showErrorMessage("clang-format not found in PATH. Is it installed?");
         }
         let fileErrors = decodeFileErrors(stderr, file);
-        let diagnostics : vscode.Diagnostic[] = [];
         fileErrors.forEach((f)=> {
             let severity = vscode.DiagnosticSeverity.Error;
             let message : string = f[0];
