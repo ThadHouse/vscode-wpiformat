@@ -58,56 +58,12 @@ function detectIfStyleguideRepoWorkspace(workspaces: vscode.WorkspaceFolder[]): 
     return false;
 }
 
-function runWpiformatOnFile(fileUri: vscode.Uri) {
-    let file : string = fileUri.fsPath;
-    var gitRepo = getRepoRoot(file);
-
-    if (gitRepo === undefined) {
-        vscode.window.showErrorMessage('File is not in a git repo');
-        return;
-    }
-
-    var filePath = path.resolve(file).substring(gitRepo.length + 1);
-
-    var exec = child_process.exec;
-
-    const arg = [`-f ${filePath}`];
-
-    let statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-    statusBar.text = 'Running WPIFormat'
-    statusBar.show();
-
-    const child = exec(`wpiformat -f ${filePath}`, {
-        cwd: gitRepo
-    }, (err, stdout, stderr) => {
-        statusBar.hide();
-        statusBar.dispose();
-        let diagnostics : vscode.Diagnostic[] = [];
-        if (err == null)  {
-            let diag = vscode.languages.createDiagnosticCollection("file");
-            diag.set(fileUri, diagnostics);
-            return;
-        }
-        if (detectClangFormatMissing(stderr)) {
-            vscode.window.showErrorMessage("clang-format not found in PATH. Is it installed?");
-        }
-        let fileErrors = decodeFileErrors(stderr, file);
-        fileErrors.forEach((f)=> {
-            let severity = vscode.DiagnosticSeverity.Error;
-            let message : string = f[0];
-            let range = new vscode.Range(f[1] - 1, 0, f[1] - 1, Number.MAX_VALUE);
-            let diagnostic = new vscode.Diagnostic(range, message, severity);
-            diagnostics.push(diagnostic);
-        });
-        let diag = vscode.languages.createDiagnosticCollection("file");
-        diag.set(fileUri, diagnostics);
-        console.log(err);
-        ;
-    });
-}
-
 function detectClangFormatMissing(error: string) : boolean {
     return error.indexOf("clang-format not found in PATH. Is it installed?") >= 0;
+}
+
+function detectWPIFormatMissing(error: string) : boolean {
+    return error.indexOf("\'wpiformat\' is not recognized") >= 0;
 }
 
 function decodeFileErrors(error: string, searchFile: string) : [string, number][] {
@@ -152,7 +108,7 @@ class WPIFormat {
             return;
         }
 
-        runWpiformatOnFile(td.uri);
+        this.runWpiformatOnFile(td.uri);
     }
 
     public async runFormatOnRequest(): Promise<void> {
@@ -165,7 +121,7 @@ class WPIFormat {
         }
 
 
-        runWpiformatOnFile(editor.document.uri);
+        this.runWpiformatOnFile(editor.document.uri);
     }
 
     public runWpiformatOnFile(fileUri: vscode.Uri) {
@@ -204,6 +160,10 @@ class WPIFormat {
             }
             if (detectClangFormatMissing(stderr)) {
                 vscode.window.showErrorMessage("clang-format not found in PATH. Is it installed?");
+            }
+            if (detectWPIFormatMissing(stderr)) {
+                vscode.window.showErrorMessage("wpiformat was not found in PATH. Is it installed?");
+                return;
             }
             let fileErrors = decodeFileErrors(stderr, file);
             let diagnostics : vscode.Diagnostic[] = [];
