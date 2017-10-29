@@ -29,25 +29,25 @@ export function activate(context: vscode.ExtensionContext) {
             return;
         }
 
-        runWpiformatOnFile(td.uri, (s) => {
-
-        });
+        runWpiformatOnFile(td.uri);
     });
 
     // The command has been defined in the package.json file
     // Now provide the implementation of the command with  registerCommand
     // The commandId parameter must match the command field in package.json
-    let disposable = vscode.commands.registerCommand('extension.wpiformatfile', () => {
+    let disposable = vscode.commands.registerCommand('extension.wpiformatfile', async () => {
         // The code you place here will be executed every time your command is executed
 
         let editor = vscode.window.activeTextEditor;
         if (!editor) return;
 
-        //editor.document.fileName
+        let config = vscode.workspace.getConfiguration('wpiformat').get('runFormatOnSave');
+        if (config === true) {
+             await vscode.window.activeTextEditor.document.save()
+        }
 
-        runWpiformatOnFile(editor.document.uri, (s) => {
 
-        });
+        runWpiformatOnFile(editor.document.uri);
 
         // Display a message box to the user
         //vscode.window.showInformationMessage(editor.document.fileName);
@@ -83,7 +83,7 @@ function detectIfStyleguideRepoWorkspace(workspaces: vscode.WorkspaceFolder[]): 
     return false;
 }
 
-function runWpiformatOnFile(fileUri: vscode.Uri, onSuccess: (output: string) => void) {
+function runWpiformatOnFile(fileUri: vscode.Uri) {
     let file : string = fileUri.fsPath;
     var gitRepo = getRepoRoot(file);
 

@@ -30,6 +30,11 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Run wpiformat on file save"
+                },
+                "wpiformat.saveOnFormatRequest": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Save file before running wpiformat"
                 }
             }
         },
