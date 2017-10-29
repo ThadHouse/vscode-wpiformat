@@ -15,6 +15,11 @@
     ],
     "main": "./out/extension",
     "contributes": {
+        "keybindings": [{
+            "command": "extension.wpiformatfile",
+            "key": "ctrl+shift+f",
+            "when": "editorTextFocus"
+        }],
         "configuration": {
             "type": "object",
             "title": "wpiformat configuration",
