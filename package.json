@@ -11,16 +11,37 @@
         "Other"
     ],
     "activationEvents": [
-        "onCommand:extension.sayHello"
+        "*"
     ],
     "main": "./out/extension",
     "contributes": {
+        "configuration": {
+            "type": "object",
+            "title": "wpiformat configuration",
+            "properties": {
+                "wpiformat.runFormatOnSave": {
+                    "type":"boolean",
+                    "default":false,
+                    "description": "Run wpiformat on file save"
+                }
+            }
+        },
         "commands": [
             {
-                "command": "extension.sayHello",
-                "title": "Hello World"
+                "command": "extension.wpiformatfile",
+                "title": "Run wpiformat on current file",
+                "category": "wpiformat"
             }
-        ]
+        ],
+        "menus": {
+            "editor/context": [{
+                "when": "editorFocus",
+                "command": "extension.wpiformatfile",
+                "group": "1_modification"
+            }
+                
+            ]
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run compile",
