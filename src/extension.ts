@@ -13,48 +13,23 @@ export function activate(context: vscode.ExtensionContext) {
     // This line of code will only be executed once when your extension is activated
     console.log('Congratulations, your extension "vscode-wpiformat" is now active!');
 
+    let format = new WPIFormat();
+
     let onDidSaveEvent = vscode.workspace.onDidSaveTextDocument((td) => {
-        let config = vscode.workspace.getConfiguration('wpiformat').get('runFormatOnSave');
-        if (config === false) {
-            return;
-        }
-
-        if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length < 1) {
-            return;
-        }
-
-        let isStyleguideWorkspace = detectIfStyleguideRepoWorkspace(vscode.workspace.workspaceFolders);
-
-        if (!detectIfStyleguideRepoWorkspace(vscode.workspace.workspaceFolders)) {
-            return;
-        }
-
-        runWpiformatOnFile(td.uri);
+        format.runFormatOnSave(td);
     });
 
     // The command has been defined in the package.json file
     // Now provide the implementation of the command with  registerCommand
     // The commandId parameter must match the command field in package.json
-    let disposable = vscode.commands.registerCommand('extension.wpiformatfile', async () => {
-        // The code you place here will be executed every time your command is executed
-
-        let editor = vscode.window.activeTextEditor;
-        if (!editor) return;
-
-        let config = vscode.workspace.getConfiguration('wpiformat').get('runFormatOnSave');
-        if (config === true) {
-             await vscode.window.activeTextEditor.document.save()
-        }
-
-
-        runWpiformatOnFile(editor.document.uri);
-
-        // Display a message box to the user
-        //vscode.window.showInformationMessage(editor.document.fileName);
+    let formatFile = vscode.commands.registerCommand('extension.wpiformatfile', async () =>
+    {
+        await format.runFormatOnRequest()
     });
 
-    context.subscriptions.push(disposable);
+    context.subscriptions.push(formatFile);
     context.subscriptions.push(onDidSaveEvent);
+    context.subscriptions.push(format);
 }
 
 // this method is called when your extension is deactivated
@@ -98,9 +73,15 @@ function runWpiformatOnFile(fileUri: vscode.Uri) {
 
     const arg = [`-f ${filePath}`];
 
+    let statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+    statusBar.text = 'Running WPIFormat'
+    statusBar.show();
+
     const child = exec(`wpiformat -f ${filePath}`, {
         cwd: gitRepo
     }, (err, stdout, stderr) => {
+        statusBar.hide();
+        statusBar.dispose();
         let diagnostics : vscode.Diagnostic[] = [];
         if (err == null)  {
             let diag = vscode.languages.createDiagnosticCollection("file");
@@ -149,4 +130,104 @@ function decodeFileErrors(error: string, searchFile: string) : [string, number][
         }
     }
     return infoArr;
+}
+
+class WPIFormat {
+    private _statusBarItem: vscode.StatusBarItem;
+    private _diagnosticCollection: vscode.DiagnosticCollection;
+
+    public runFormatOnSave(td: vscode.TextDocument) : void {
+        let config = vscode.workspace.getConfiguration('wpiformat').get('runFormatOnSave');
+        if (config === false) {
+            return;
+        }
+
+        if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length < 1) {
+            return;
+        }
+
+        let isStyleguideWorkspace = detectIfStyleguideRepoWorkspace(vscode.workspace.workspaceFolders);
+
+        if (!detectIfStyleguideRepoWorkspace(vscode.workspace.workspaceFolders)) {
+            return;
+        }
+
+        runWpiformatOnFile(td.uri);
+    }
+
+    public async runFormatOnRequest(): Promise<void> {
+        let editor = vscode.window.activeTextEditor;
+        if (!editor) return;
+
+        let config = vscode.workspace.getConfiguration('wpiformat').get('saveOnFormatRequest');
+        if (config === true) {
+             await vscode.window.activeTextEditor.document.save()
+        }
+
+
+        runWpiformatOnFile(editor.document.uri);
+    }
+
+    public runWpiformatOnFile(fileUri: vscode.Uri) {
+        let file : string = fileUri.fsPath;
+        var gitRepo = getRepoRoot(file);
+
+        if (gitRepo === undefined) {
+            vscode.window.showErrorMessage('File is not in a git repo');
+            return;
+        }
+
+        var filePath = path.resolve(file).substring(gitRepo.length + 1);
+
+        var exec = child_process.exec;
+
+        const arg = [`-f ${filePath}`];
+
+        if (!this._statusBarItem) {
+            this._statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+        }
+
+        if (!this._diagnosticCollection) {
+            this._diagnosticCollection = vscode.languages.createDiagnosticCollection("wpiformat");
+        }
+
+        this._statusBarItem.text = 'Running WPIFormat'
+        this._statusBarItem.show();
+
+        const child = exec(`wpiformat -f ${filePath}`, {
+            cwd: gitRepo
+        }, (err, stdout, stderr) => {
+            this._statusBarItem.hide();
+            this._diagnosticCollection.clear();
+            if (err == null)  {
+                return;
+            }
+            if (detectClangFormatMissing(stderr)) {
+                vscode.window.showErrorMessage("clang-format not found in PATH. Is it installed?");
+            }
+            let fileErrors = decodeFileErrors(stderr, file);
+            let diagnostics : vscode.Diagnostic[] = [];
+            fileErrors.forEach((f)=> {
+                let severity = vscode.DiagnosticSeverity.Error;
+                let message : string = f[0];
+                let range = new vscode.Range(f[1] - 1, 0, f[1] - 1, Number.MAX_VALUE);
+                let diagnostic = new vscode.Diagnostic(range, message, severity);
+                diagnostics.push(diagnostic);
+            });
+            this._diagnosticCollection.set(fileUri, diagnostics);
+            console.log(err);
+            ;
+        });
+    }
+
+
+
+    dispose() {
+        if (this._statusBarItem) {
+            this._statusBarItem.dispose();
+        }
+        if (this._diagnosticCollection) {
+            this._diagnosticCollection.dispose();
+        }
+    }
 }
