@@ -15,18 +15,20 @@
     ],
     "main": "./out/extension",
     "contributes": {
-        "keybindings": [{
-            "command": "extension.wpiformatfile",
-            "key": "ctrl+shift+f",
-            "when": "editorTextFocus"
-        }],
+        "keybindings": [
+            {
+                "command": "extension.wpiformatfile",
+                "key": "ctrl+shift+f",
+                "when": "editorTextFocus"
+            }
+        ],
         "configuration": {
             "type": "object",
             "title": "wpiformat configuration",
             "properties": {
                 "wpiformat.runFormatOnSave": {
-                    "type":"boolean",
-                    "default":false,
+                    "type": "boolean",
+                    "default": false,
                     "description": "Run wpiformat on file save"
                 }
             }
@@ -39,12 +41,12 @@
             }
         ],
         "menus": {
-            "editor/context": [{
-                "when": "editorFocus",
-                "command": "extension.wpiformatfile",
-                "group": "1_modification"
-            }
-                
+            "editor/context": [
+                {
+                    "when": "editorFocus",
+                    "command": "extension.wpiformatfile",
+                    "group": "1_modification"
+                }
             ]
         }
     },
