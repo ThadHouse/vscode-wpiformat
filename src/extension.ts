@@ -47,15 +47,10 @@ function getRepoRoot(fullPath: string): string {
     return undefined;
 }
 
-function detectIfStyleguideRepoWorkspace(workspaces: vscode.WorkspaceFolder[]): boolean {
-    var index = 0;
-    for (index = 0; index < workspaces.length; index++) {
-        let fPath = workspaces[index].uri.fsPath
-        if (fs.existsSync(path.join(fPath, '.styleguide'))) {
-            return true;
-        }
-    }
-    return false;
+function detectIfWorkspaceHasStyleGuide(uri: vscode.Uri): boolean {
+    let ret = vscode.workspace.getWorkspaceFolder(uri);
+    if (!ret) return false;
+    return fs.existsSync(path.join(ret.uri.fsPath, '.styleguide'));
 }
 
 function detectClangFormatMissing(error: string) : boolean {
@@ -98,13 +93,7 @@ class WPIFormat {
             return;
         }
 
-        if (vscode.workspace.workspaceFolders === undefined || vscode.workspace.workspaceFolders.length < 1) {
-            return;
-        }
-
-        let isStyleguideWorkspace = detectIfStyleguideRepoWorkspace(vscode.workspace.workspaceFolders);
-
-        if (!detectIfStyleguideRepoWorkspace(vscode.workspace.workspaceFolders)) {
+        if (!detectIfWorkspaceHasStyleGuide(td.uri)) {
             return;
         }
 
