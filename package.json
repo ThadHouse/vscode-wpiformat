@@ -35,6 +35,16 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Save file before running wpiformat"
+                },
+                "wpiformat.forceLFOnSave": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Force LF on file save"
+                },
+                "wpiformat.ignoreForceLFSaveFiles": {
+                    "type": "array",
+                    "default": {},
+                    "description": "Ignore these files on save, * for wildcard"
                 }
             }
         },
@@ -67,5 +77,8 @@
         "vscode": "^1.1.5",
         "@types/node": "^7.0.43",
         "@types/mocha": "^2.2.42"
+    },
+    "dependencies": {
+        "micromatch": "^3.1.5"
     }
 }

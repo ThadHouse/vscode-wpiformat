@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path'
 import * as child_process from 'child_process'
+import * as mm from 'micromatch'
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -14,6 +15,30 @@ export function activate(context: vscode.ExtensionContext) {
     console.log('Congratulations, your extension "vscode-wpiformat" is now active!');
 
     let format = new WPIFormat();
+
+    context.subscriptions.push(vscode.workspace.onWillSaveTextDocument(e => {
+        let td = e.document;
+
+        let formatConfig = vscode.workspace.getConfiguration('wpiformat');
+
+        let lfsave = formatConfig.get("forceLFOnSave");
+
+
+        if (lfsave == true) {
+            let ignoreFiles: string[] = formatConfig.get("ignoreForceLFSaveFiles");
+            let fname = path.basename(td.fileName);
+
+            let foundMatch = false;
+
+            let matches : string[] = mm(fname, ignoreFiles);
+
+            if (matches.length === 0 && td.eol === vscode.EndOfLine.CRLF) {
+                const edit = vscode.TextEdit.setEndOfLine(vscode.EndOfLine.LF);
+                e.waitUntil(Promise.resolve([edit]));
+            }
+
+        }
+    }));
 
     let onDidSaveEvent = vscode.workspace.onDidSaveTextDocument((td) => {
         format.runFormatOnSave(td);
@@ -88,7 +113,9 @@ class WPIFormat {
     private _diagnosticCollection: vscode.DiagnosticCollection;
 
     public runFormatOnSave(td: vscode.TextDocument) : void {
-        let config = vscode.workspace.getConfiguration('wpiformat').get('runFormatOnSave');
+        let formatConfig = vscode.workspace.getConfiguration('wpiformat');
+
+        let config = formatConfig.get('runFormatOnSave');
         if (config === false) {
             return;
         }
