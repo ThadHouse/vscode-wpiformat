@@ -1,11 +1,11 @@
 'use strict';
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
-import * as vscode from 'vscode';
+import * as child_process from 'child_process';
 import * as fs from 'fs';
-import * as path from 'path'
-import * as child_process from 'child_process'
-import * as mm from 'micromatch'
+import * as mm from 'micromatch';
+import * as path from 'path';
+import * as vscode from 'vscode';
 
 // this method is called when your extension is activated
 // your extension is activated the very first time the command is executed
@@ -14,23 +14,21 @@ export function activate(context: vscode.ExtensionContext) {
     // This line of code will only be executed once when your extension is activated
     console.log('Congratulations, your extension "vscode-wpiformat" is now active!');
 
-    let format = new WPIFormat();
+    const format = new WPIFormat();
 
-    context.subscriptions.push(vscode.workspace.onWillSaveTextDocument(e => {
-        let td = e.document;
+    context.subscriptions.push(vscode.workspace.onWillSaveTextDocument((e) => {
+        const td = e.document;
 
-        let formatConfig = vscode.workspace.getConfiguration('wpiformat');
+        const formatConfig = vscode.workspace.getConfiguration('wpiformat');
 
-        let lfsave = formatConfig.get("forceLFOnSave");
+        const lfsave = formatConfig.get('forceLFOnSave');
 
+        if (lfsave === true) {
+            const origIgnoreFiles: string[] | undefined = formatConfig.get('ignoreForceLFSaveFiles');
+            const ignoreFiles: string[] = origIgnoreFiles !== undefined ? origIgnoreFiles : [];
+            const fname = path.basename(td.fileName);
 
-        if (lfsave == true) {
-            let ignoreFiles: string[] = formatConfig.get("ignoreForceLFSaveFiles");
-            let fname = path.basename(td.fileName);
-
-            let foundMatch = false;
-
-            let matches : string[] = mm(fname, ignoreFiles);
+            const matches: string[] = mm([fname], ignoreFiles);
 
             if (matches.length === 0 && td.eol === vscode.EndOfLine.CRLF) {
                 const edit = vscode.TextEdit.setEndOfLine(vscode.EndOfLine.LF);
@@ -40,16 +38,15 @@ export function activate(context: vscode.ExtensionContext) {
         }
     }));
 
-    let onDidSaveEvent = vscode.workspace.onDidSaveTextDocument((td) => {
+    const onDidSaveEvent = vscode.workspace.onDidSaveTextDocument((td) => {
         format.runFormatOnSave(td);
     });
 
     // The command has been defined in the package.json file
     // Now provide the implementation of the command with  registerCommand
     // The commandId parameter must match the command field in package.json
-    let formatFile = vscode.commands.registerCommand('extension.wpiformatfile', async () =>
-    {
-        await format.runFormatOnRequest()
+    const formatFile = vscode.commands.registerCommand('extension.wpiformatfile', async () => {
+        await format.runFormatOnRequest();
     });
 
     context.subscriptions.push(formatFile);
@@ -58,11 +55,11 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 // this method is called when your extension is deactivated
-export function deactivate() {
-}
+// tslint:disable-next-line:no-empty
+export function deactivate() { }
 
-function getRepoRoot(fullPath: string): string {
-    var currentDir = path.resolve(fullPath);
+function getRepoRoot(fullPath: string): string | undefined {
+    let currentDir = path.resolve(fullPath);
     while (currentDir !== path.dirname(currentDir)) {
         if (fs.existsSync(path.join(currentDir, '.git'))) {
             return currentDir;
@@ -73,33 +70,34 @@ function getRepoRoot(fullPath: string): string {
 }
 
 function detectIfWorkspaceHasStyleGuide(uri: vscode.Uri): boolean {
-    let ret = vscode.workspace.getWorkspaceFolder(uri);
-    if (!ret) return false;
+    const ret = vscode.workspace.getWorkspaceFolder(uri);
+    if (!ret) { return false; }
     return fs.existsSync(path.join(ret.uri.fsPath, '.styleguide'));
 }
 
-function detectClangFormatMissing(error: string) : boolean {
-    return error.indexOf("clang-format not found in PATH. Is it installed?") >= 0;
+function detectClangFormatMissing(error: string): boolean {
+    return error.indexOf('clang-format not found in PATH. Is it installed?') >= 0;
 }
 
-function detectWPIFormatMissing(error: string) : boolean {
+function detectWPIFormatMissing(error: string): boolean {
+    // tslint:disable-next-line:quotemark
     return error.indexOf("\'wpiformat\' is not recognized") >= 0;
 }
 
-function decodeFileErrors(error: string, searchFile: string) : [string, number][] {
-    let infoArr : [string, number][] = [];
+function decodeFileErrors(error: string, searchFile: string): Array<[string, number]> {
+    const infoArr: Array<[string, number]> = [];
     // split error string by line
-    let fileLen = searchFile.length;
-    let lines = error.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-        let startIndex = lines[i].indexOf(searchFile);
+    const fileLen = searchFile.length;
+    const lines = error.split('\n');
+    for (const line of lines) {
+        const startIndex = line.indexOf(searchFile);
         if (startIndex >= 0) {
-            let afterFile = lines[i].substring(startIndex + fileLen + 1);
-            let splitLine = afterFile.split(':');
-            if (splitLine.length < 2) continue;
-            let errorLine = parseInt(splitLine[0].trim());
-            let errorString = splitLine[1].trim();
-            let errorInfo : [string, number] = [errorString, errorLine];
+            const afterFile = line.substring(startIndex + fileLen + 1);
+            const splitLine = afterFile.split(':');
+            if (splitLine.length < 2) { continue; }
+            const errorLine = parseInt(splitLine[0].trim(), 10);
+            const errorString = splitLine[1].trim();
+            const errorInfo: [string, number] = [errorString, errorLine];
             infoArr.push(errorInfo);
             // Found file. Find error line
 
@@ -109,13 +107,20 @@ function decodeFileErrors(error: string, searchFile: string) : [string, number][
 }
 
 class WPIFormat {
-    private _statusBarItem: vscode.StatusBarItem;
-    private _diagnosticCollection: vscode.DiagnosticCollection;
+    private readonly _statusBarItem: vscode.StatusBarItem;
+    private readonly _diagnosticCollection: vscode.DiagnosticCollection;
 
-    public runFormatOnSave(td: vscode.TextDocument) : void {
-        let formatConfig = vscode.workspace.getConfiguration('wpiformat');
+    constructor() {
+        this._statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
+        this._statusBarItem.hide();
+        this._diagnosticCollection = vscode.languages.createDiagnosticCollection('wpiformat');
+        //
+    }
 
-        let config = formatConfig.get('runFormatOnSave');
+    public runFormatOnSave(td: vscode.TextDocument): void {
+        const formatConfig = vscode.workspace.getConfiguration('wpiformat');
+
+        const config = formatConfig.get('runFormatOnSave');
         if (config === false) {
             return;
         }
@@ -128,82 +133,66 @@ class WPIFormat {
     }
 
     public async runFormatOnRequest(): Promise<void> {
-        let editor = vscode.window.activeTextEditor;
-        if (!editor) return;
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) { return; }
 
-        let config = vscode.workspace.getConfiguration('wpiformat').get('saveOnFormatRequest');
-        if (config === true) {
-             await vscode.window.activeTextEditor.document.save()
+        const config = vscode.workspace.getConfiguration('wpiformat').get('saveOnFormatRequest');
+        const window = vscode.window.activeTextEditor;
+        if (config === true && window) {
+             await window.document.save();
         }
-
 
         this.runWpiformatOnFile(editor.document.uri);
     }
 
     public runWpiformatOnFile(fileUri: vscode.Uri) {
-        let file : string = fileUri.fsPath;
-        var gitRepo = getRepoRoot(file);
+        const file: string = fileUri.fsPath;
+        const gitRepo = getRepoRoot(file);
 
         if (gitRepo === undefined) {
             vscode.window.showErrorMessage('File is not in a git repo');
             return;
         }
 
-        var filePath = path.resolve(file).substring(gitRepo.length + 1);
+        const filePath = path.resolve(file).substring(gitRepo.length + 1);
 
-        var exec = child_process.exec;
+        const exec = child_process.exec;
 
-        const arg = [`-f ${filePath}`];
-
-        if (!this._statusBarItem) {
-            this._statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left);
-        }
-
-        if (!this._diagnosticCollection) {
-            this._diagnosticCollection = vscode.languages.createDiagnosticCollection("wpiformat");
-        }
-
-        this._statusBarItem.text = 'Running WPIFormat'
+        this._statusBarItem.text = 'Running WPIFormat';
         this._statusBarItem.show();
 
-        const child = exec(`wpiformat -f ${filePath}`, {
-            cwd: gitRepo
-        }, (err, stdout, stderr) => {
+        exec(`wpiformat -f ${filePath}`, {
+            cwd: gitRepo,
+        }, (err, _, stderr) => {
             this._statusBarItem.hide();
             this._diagnosticCollection.clear();
-            if (err == null)  {
+            if (err === null)  {
                 return;
             }
             if (detectClangFormatMissing(stderr)) {
-                vscode.window.showErrorMessage("clang-format not found in PATH. Is it installed?");
+                vscode.window.showErrorMessage('clang-format not found in PATH. Is it installed?');
             }
             if (detectWPIFormatMissing(stderr)) {
-                vscode.window.showErrorMessage("wpiformat was not found in PATH. Is it installed?");
+                vscode.window.showErrorMessage('wpiformat was not found in PATH. Is it installed?');
                 return;
             }
-            let fileErrors = decodeFileErrors(stderr, file);
-            let diagnostics : vscode.Diagnostic[] = [];
-            fileErrors.forEach((f)=> {
-                let severity = vscode.DiagnosticSeverity.Error;
-                let message : string = f[0];
-                let range = new vscode.Range(f[1] - 1, 0, f[1] - 1, Number.MAX_VALUE);
-                let diagnostic = new vscode.Diagnostic(range, message, severity);
+            const fileErrors = decodeFileErrors(stderr, file);
+            const diagnostics: vscode.Diagnostic[] = [];
+            fileErrors.forEach((f) => {
+                const severity = vscode.DiagnosticSeverity.Error;
+                const message: string = f[0];
+                const range = new vscode.Range(f[1] - 1, 0, f[1] - 1, Number.MAX_VALUE);
+                const diagnostic = new vscode.Diagnostic(range, message, severity);
                 diagnostics.push(diagnostic);
             });
             this._diagnosticCollection.set(fileUri, diagnostics);
             console.log(err);
-            ;
+
         });
     }
 
-
-
-    dispose() {
-        if (this._statusBarItem) {
-            this._statusBarItem.dispose();
-        }
-        if (this._diagnosticCollection) {
-            this._diagnosticCollection.dispose();
-        }
+    public dispose() {
+        this._statusBarItem.dispose();
+        this._diagnosticCollection.dispose();
     }
 }
